@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golfbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .chat-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 20px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #3498db;
+            color: white;
+            margin-left: auto;
+            border-top-right-radius: 5px;
+        }
+        .agent-message {
+            background-color: #eee;
+            margin-right: auto;
+            border-top-left-radius: 5px;
+        }
+        .agent-message pre {
+            white-space: pre-wrap;
+            margin: 0;
+            font-family: inherit;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .examples {
+            margin-top: 20px;
+        }
+        .example-query {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px 10px;
+            background-color: #eee;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .example-query:hover {
+            background-color: #ddd;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .loading:after {
+            content: '';
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #3498db;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Golf Assistant Chatbot</h1>
+    <div class="chat-container" id="chat-container">
+        <div class="message agent-message">
+            <p>Hello! I'm your golf assistant. Ask me questions about golf physics, calculations, or search for information.</p>
+        </div>
+    </div>
+    
+    <div class="loading" id="loading"></div>
+    
+    <div class="input-container">
+        <input type="text" id="user-input" placeholder="Ask me a question...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+    
+    <div class="examples">
+        <p>Example queries:</p>
+        <div class="example-query" onclick="useExample('If a golf ball travels 150 meters in 3 seconds, what is its speed?')">Calculate ball speed</div>
+        <div class="example-query" onclick="useExample('If a golf club opens by 5 degrees but closes by 2 degrees, what is the final face angle?')">Calculate face angle</div>
+        <div class="example-query" onclick="useExample('If a golf ball is hit at 40 m/s with a launch angle of 30 degrees, how far will it travel?')">Calculate distance</div>
+        <div class="example-query" onclick="useExample('If the impact force of a swing is 500N and the club weighs 0.5kg, what is the swing speed?')">Calculate swing speed</div>
+        <div class="example-query" onclick="useExample('Search for the best golf clubs for beginners')">Search for beginner clubs</div>
+    </div>
+    
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const loadingIndicator = document.getElementById('loading');
+        
+        userInput.addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        function useExample(text) {
+            userInput.value = text;
+        }
+        
+        function addMessage(text, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
+            
+            if (isUser) {
+                messageDiv.textContent = text;
+            } else {
+                try {
+                    // Try to parse the response as JSON
+                    const parsedResponse = JSON.parse(text);
+                    const content = document.createElement('div');
+                    
+                    if (parsedResponse.tool_call && parsedResponse.final_answer) {
+                        const toolCall = document.createElement('p');
+                        toolCall.innerHTML = `<strong>Tool:</strong> ${parsedResponse.tool_call}`;
+                        
+                        const answer = document.createElement('p');
+                        answer.innerHTML = `<strong>Answer:</strong> ${parsedResponse.final_answer}`;
+                        
+                        content.appendChild(toolCall);
+                        content.appendChild(answer);
+                    } else {
+                        content.textContent = JSON.stringify(parsedResponse, null, 2);
+                    }
+                    
+                    messageDiv.appendChild(content);
+                } catch (e) {
+                    // If not JSON, display as regular text
+                    messageDiv.textContent = text;
+                }
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+            
+            addMessage(message, true);
+            userInput.value = '';
+            
+            loadingIndicator.style.display = 'block';
+            
+            fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.style.display = 'none';
+                if (data.success) {
+                    addMessage(JSON.stringify(data.result), false);
+                } else {
+                    // Handle the error by displaying a formatted message
+                    if (data.raw) {
+                        addMessage(`The assistant had trouble formatting the response. Here's what it said:\n\n${data.raw}`, false);
+                    } else {
+                        addMessage('Error: ' + data.error, false);
+                    }
+                }
+            })
+            .catch(error => {
+                loadingIndicator.style.display = 'none';
+                addMessage('Error: Could not connect to the server', false);
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+</html>
